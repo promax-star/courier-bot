@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Курс: работа с нейросетями</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, 'Segoe UI', Roboto, sans-serif; background: #09090b; color: #f4f4f5; min-height: 100vh; padding: 20px 14px 60px; }
+  main { max-width: 680px; margin: 0 auto; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  h2 { font-size: 18px; margin: 18px 0 8px; }
+  p, li { line-height: 1.6; font-size: 15px; color: #d4d4d8; }
+  ul, ol { padding-left: 20px; margin: 8px 0; }
+  li { margin-bottom: 4px; }
+  strong { color: #fafafa; }
+  code { background: #27272a; border-radius: 5px; padding: 1px 6px; font-size: 13px; color: #a5f3fc; }
+  pre { background: #18181b; border: 1px solid #27272a; border-radius: 10px; padding: 12px; overflow-x: auto; margin: 10px 0; }
+  pre code { background: none; padding: 0; color: #d4d4d8; line-height: 1.5; }
+  .muted { color: #71717a; font-size: 13px; }
+  .card { background: #18181b; border: 1px solid #27272a; border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+  .card h2 { margin: 0 0 6px; font-size: 16px; }
+  .meta { font-size: 12px; color: #71717a; margin-bottom: 8px; }
+  .badge { display: inline-block; font-size: 11px; border-radius: 99px; padding: 2px 9px; margin-right: 6px; }
+  .badge.ok { background: #052e16; color: #4ade80; }
+  .badge.part { background: #312e81; color: #a5b4fc; }
+  .badge.todo { background: #27272a; color: #a1a1aa; }
+  .btn { display: inline-block; background: #10b981; color: #052e16; border: none; border-radius: 12px; padding: 11px 20px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 12px; }
+  .btn:disabled { opacity: .35; cursor: default; }
+  .btn-ghost { background: transparent; color: #a1a1aa; border: 1px solid #3f3f46; font-weight: 500; }
+  .btn-sm { padding: 7px 14px; font-size: 13px; border-radius: 9px; margin-top: 0; }
+  .progress-track { height: 10px; background: #27272a; border-radius: 99px; overflow: hidden; margin: 12px 0 20px; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, #059669, #34d399); transition: width .3s; }
+  .option { display: block; width: 100%; text-align: left; background: #18181b; border: 1px solid #27272a; border-radius: 12px; padding: 13px 15px; margin-bottom: 9px; color: #e4e4e7; font-size: 15px; line-height: 1.4; cursor: pointer; }
+  .option:hover:not(:disabled) { border-color: #52525b; }
+  .option:disabled { cursor: default; }
+  .option.correct { background: #052e16; border-color: #16a34a; }
+  .option.wrong { background: #450a0a; border-color: #dc2626; }
+  .explain { background: #18181b; border: 1px solid #27272a; border-left: 3px solid #34d399; border-radius: 12px; padding: 12px 14px; font-size: 14px; line-height: 1.55; color: #d4d4d8; margin: 12px 0; }
+  .check { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 8px; cursor: pointer; }
+  .check input { margin-top: 4px; width: 16px; height: 16px; accent-color: #10b981; }
+  .callout { border-left: 3px solid #f59e0b; background: #18181b; border-radius: 10px; padding: 12px 14px; margin: 12px 0; font-size: 14px; line-height: 1.55; color: #fbbf24; }
+  .hidden { display: none; }
+  .topnav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .topnav a { color: #71717a; text-decoration: none; font-size: 14px; }
+  .topnav a:hover { color: #d4d4d8; }
+  footer { text-align: center; font-size: 12px; color: #52525b; margin-top: 40px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="topnav">
+    <a href="#" onclick="goHome(); return false;">← К оглавлению</a>
+    <a href="/courier-bot/">Курьер-дашборд</a>
+  </div>
+  <div id="view"></div>
+  <footer>Курс «Работа с нейросетями» · часть проекта <a style="color:#52525b" href="https://github.com/promax-star/courier-bot">courier-bot</a></footer>
+</main>
+
+<script src="data.js"></script>
+<script>
+const KEY = 'aiCourseProgressV1';
+let progress = JSON.parse(localStorage.getItem(KEY) || '{}');
+function save() { localStorage.setItem(KEY, JSON.stringify(progress)); }
+function el(id) { return document.getElementById(id); }
+function view() { return el('view'); }
+function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+
+const ALL_LESSONS = MODULES.flatMap((m, mi) => m.lessons.map((_, li) => `m${mi}l${li}`));
+const ALL_TASKS = MODULES.flatMap((m, mi) => m.tasks.map((_, ti) => `m${mi}t${ti}`));
+function totalMinutes() {
+  let t = 0;
+  MODULES.forEach((m) => {
+    m.lessons.forEach((l) => t += l.min);
+    m.tasks.forEach((k) => t += k.min);
+    t += m.quiz.length; // ~1 мин на вопрос
+  });
+  t += EXAM.length * 1.2;
+  return Math.round(t);
+}
+function moduleDone(mi) {
+  const m = MODULES[mi];
+  const lessons = m.lessons.every((_, li) => progress[`m${mi}l${li}`]);
+  const tasks = m.tasks.every((_, ti) => progress[`m${mi}t${ti}`]);
+  const quiz = (progress[`m${mi}quiz`] ?? 0) >= Math.ceil(m.quiz.length * 0.8);
+  return lessons && tasks && quiz;
+}
+function overallPercent() {
+  const parts = ALL_LESSONS.filter((k) => progress[k]).length
+    + ALL_TASKS.filter((k) => progress[k]).length
+    + MODULES.filter((_, mi) => (progress[`m${mi}quiz`] ?? 0) >= Math.ceil(MODULES[mi].quiz.length * 0.8)).length
+    + (progress.examPassed ? 1 : 0);
+  const total = ALL_LESSONS.length + ALL_TASKS.length + MODULES.length + 1;
+  return Math.round((parts / total) * 100);
+}
+
+function goHome() { renderHome(); window.scrollTo(0, 0); }
+
+function renderHome() {
+  const pct = overallPercent();
+  view().innerHTML = `
+    <h1>🎓 Курс «Работа с нейросетями»</h1>
+    <p class="muted">Практический курс: от «что такое токен» до своего AI-сервиса в проде. ≈ ${totalMinutes()} минут · 6 модулей · ${ALL_LESSONS.length} уроков · ${ALL_TASKS.length} задач · экзамен</p>
+    <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+    <p class="muted" style="margin:-14px 0 18px">Прогресс: ${pct}%${progress.examPassed ? ' · 🏆 экзамен сдан' : ''}</p>
+    ${MODULES.map((m, mi) => {
+      const done = moduleDone(mi);
+      const lessonsDone = m.lessons.filter((_, li) => progress[`m${mi}l${li}`]).length;
+      const tasksDone = m.tasks.filter((_, ti) => progress[`m${mi}t${ti}`]).length;
+      const qOk = (progress[`m${mi}quiz`] ?? 0) >= Math.ceil(m.quiz.length * 0.8);
+      const badge = done ? '<span class="badge ok">✓ пройден</span>' : (lessonsDone || tasksDone ? '<span class="badge part">в процессе</span>' : '<span class="badge todo">не начат</span>');
+      const mt = m.lessons.reduce((s, l) => s + l.min, 0) + m.tasks.reduce((s, t) => s + t.min, 0) + m.quiz.length;
+      return `<div class="card">
+        <h2>${m.icon} ${m.title} ${badge}</h2>
+        <div class="meta">≈ ${mt} мин · уроки ${lessonsDone}/${m.lessons.length} · задачи ${tasksDone}/${m.tasks.length} · квиз ${qOk ? '✓' : Math.ceil(m.quiz.length * 0.8) + ' из ' + m.quiz.length + ' для зачёта'}</div>
+        <p>${m.summary}</p>
+        <button class="btn btn-sm" style="margin-top:10px" onclick="renderModule(${mi})">Открыть модуль →</button>
+      </div>`;
+    }).join('')}
+    <div class="card" style="border-color:#3f6212">
+      <h2>🏆 Финальный экзамен</h2>
+      <div class="meta">15 вопросов по всем модулям · для зачёта нужно ≥ 12 правильных · ≈ 18 мин</div>
+      <p>Доступен после прохождения всех модулей${progress.examPassed ? ' — но можно пересдать!' : '.'}</p>
+      <button class="btn btn-sm" style="margin-top:10px" onclick="startExam()" ${allModulesDone() ? '' : 'disabled'}>Экзамен →</button>
+    </div>
+    <p style="margin-top:16px"><button class="btn btn-ghost btn-sm" onclick="if(confirm('Сбросить весь прогресс?')){progress={};save();goHome();}">Сбросить прогресс</button></p>
+  `;
+}
+function allModulesDone() { return MODULES.every((_, mi) => moduleDone(mi)); }
+
+function renderModule(mi) {
+  const m = MODULES[mi];
+  const lessonRow = (l, li) => `
+    <div class="card" style="padding:13px 16px">
+      <h2>Урок ${li + 1}. ${l.title}</h2>
+      <div class="meta">≈ ${l.min} мин ${progress[`m${mi}l${li}`] ? '· <span style="color:#4ade80">✓ прочитан</span>' : ''}</div>
+      <button class="btn btn-sm" onclick="renderLesson(${mi},${li})">${progress[`m${mi}l${li}`] ? 'Перечитать' : 'Читать'} →</button>
+    </div>`;
+  const taskRow = (t, ti) => `
+    <div class="card" style="padding:13px 16px">
+      <h2>Задача ${ti + 1}. ${t.title}</h2>
+      <div class="meta">≈ ${t.min} мин ${progress[`m${mi}t${ti}`] ? '· <span style="color:#4ade80">✓ сделана</span>' : ''}</div>
+      <button class="btn btn-sm" onclick="renderTask(${mi},${ti})">${progress[`m${mi}t${ti}`] ? 'Открыть' : 'Решать'} →</button>
+    </div>`;
+  const qScore = progress[`m${mi}quiz`];
+  const qOk = (qScore ?? 0) >= Math.ceil(m.quiz.length * 0.8);
+  view().innerHTML = `
+    <h1>${m.icon} ${m.title}</h1>
+    <p class="muted" style="margin-bottom:16px">${m.summary}</p>
+    <h2>📖 Уроки</h2>
+    ${m.lessons.map(lessonRow).join('')}
+    <h2>🛠 Задачи</h2>
+    ${m.tasks.map(taskRow).join('') || '<p class="muted">В этом модуле задачи нет — только теория и квиз.</p>'}
+    <h2>❓ Квиз модуля</h2>
+    <div class="card">
+      <div class="meta">${m.quiz.length} вопросов · для зачёта нужно ≥ ${Math.ceil(m.quiz.length * 0.8)} · ${qScore != null ? `лучший результат: ${qScore}/${m.quiz.length}` : 'ещё не пройден'}</div>
+      ${qOk ? '<p style="color:#4ade80;font-size:14px">✓ Зачёт получен. Можно пересдать.</p>' : ''}
+      <button class="btn btn-sm" onclick="startQuiz(${mi})">${qScore != null ? 'Пересдать' : 'Пройти'} квиз →</button>
+    </div>
+  `;
+  window.scrollTo(0, 0);
+}
+
+function renderLesson(mi, li) {
+  const l = MODULES[mi].lessons[li];
+  view().innerHTML = `
+    <h1>${MODULES[mi].icon} Урок: ${l.title}</h1>
+    <p class="muted" style="margin-bottom:14px">Модуль ${mi + 1} · ≈ ${l.min} мин чтения</p>
+    <div class="card">${l.html}</div>
+    <button class="btn" onclick="markLesson(${mi},${li})">${progress[`m${mi}l${li}`] ? 'Дальше →' : '✓ Прочитал, дальше →'}</button>
+  `;
+  window.scrollTo(0, 0);
+}
+function markLesson(mi, li) {
+  progress[`m${mi}l${li}`] = true; save();
+  const m = MODULES[mi];
+  if (li + 1 < m.lessons.length) renderLesson(mi, li + 1);
+  else if (m.tasks.length) renderTask(mi, 0);
+  else renderModule(mi);
+}
+
+function renderTask(mi, ti) {
+  const t = MODULES[mi].tasks[ti];
+  const checks = t.checklist.map((c, ci) => `
+    <label class="check"><input type="checkbox" ${progress[`m${mi}t${ti}c${ci}`] ? 'checked' : ''} onchange="progress['m${mi}t${ti}c${ci}']=this.checked;save();taskCheck(${mi},${ti})"> <span>${c}</span></label>`).join('');
+  view().innerHTML = `
+    <h1>🛠 Задача: ${t.title}</h1>
+    <p class="muted" style="margin-bottom:14px">Модуль ${mi + 1} · ≈ ${t.min} мин практики</p>
+    <div class="card">
+      <p>${t.goal}</p>
+      <h2>Как делать</h2>
+      <ol>${t.steps.map((s) => `<li>${s}</li>`).join('')}</ol>
+      ${t.hint ? `<div class="callout">💡 Подсказка: ${t.hint}</div>` : ''}
+    </div>
+    <div class="card">
+      <h2>✅ Чек-лист самопроверки</h2>
+      ${checks}
+      <button class="btn" id="taskBtn" onclick="markTask(${mi},${ti})" ${t.checklist.every((_, ci) => progress[`m${mi}t${ti}c${ci}`]) ? '' : 'disabled'}>${progress[`m${mi}t${ti}`] ? '✓ Засчитано · дальше →' : 'Засчитать задачу →'}</button>
+    </div>
+  `;
+  window.scrollTo(0, 0);
+}
+function taskCheck(mi, ti) {
+  const t = MODULES[mi].tasks[ti];
+  el('taskBtn').disabled = !t.checklist.every((_, ci) => progress[`m${mi}t${ti}c${ci}`]);
+}
+function markTask(mi, ti) {
+  progress[`m${mi}t${ti}`] = true; save();
+  const m = MODULES[mi];
+  if (ti + 1 < m.tasks.length) renderTask(mi, ti + 1);
+  else renderModule(mi);
+}
+
+// ---------- квизы ----------
+let qState = null;
+function startQuiz(mi) {
+  qState = { mode: 'quiz', mi, order: shuffle(MODULES[mi].quiz.map((_, i) => i)), idx: 0, score: 0 };
+  renderQuestion();
+}
+function startExam() {
+  qState = { mode: 'exam', order: shuffle(EXAM.map((_, i) => i)), idx: 0, score: 0, log: [] };
+  renderQuestion();
+}
+function renderQuestion() {
+  const s = qState;
+  const item = s.mode === 'exam' ? EXAM[s.order[s.idx]] : MODULES[s.mi].quiz[s.order[s.idx]];
+  const total = s.mode === 'exam' ? EXAM.length : MODULES[s.mi].quiz.length;
+  view().innerHTML = `
+    <h1>${s.mode === 'exam' ? '🏆 Экзамен' : '❓ Квиз модуля ' + (s.mi + 1)}</h1>
+    <div class="progress-track" style="margin-top:12px"><div class="progress-fill" style="width:${(s.idx / total) * 100}%"></div></div>
+    <p class="muted">Вопрос ${s.idx + 1} из ${total}</p>
+    <div class="card"><p style="font-size:16px;color:#fafafa">${item.q}</p></div>
+    <div id="options"></div>
+    <div class="explain hidden" id="explain"></div>
+    <button class="btn" id="nextBtn" disabled onclick="nextQ()">Далее →</button>
+  `;
+  const box = el('options');
+  shuffle(item.options.map((text, orig) => ({ text, orig }))).forEach(({ text, orig }) => {
+    const b = document.createElement('button');
+    b.className = 'option'; b.textContent = text;
+    b.onclick = () => answerQ(orig, b, item);
+    box.appendChild(b);
+  });
+  window.scrollTo(0, 0);
+}
+function answerQ(orig, btn, item) {
+  const s = qState;
+  [...el('options').children].forEach((b) => { b.disabled = true; });
+  const correct = orig === item.answer;
+  if (correct) s.score++;
+  if (s.mode === 'exam') s.log.push({ q: item.q, correct, explain: item.explain });
+  [...el('options').children].forEach((b) => {
+    if (b === btn) b.classList.add(correct ? 'correct' : 'wrong');
+    if (!correct && b.textContent === item.options[item.answer]) b.classList.add('correct');
+  });
+  const ex = el('explain');
+  ex.classList.remove('hidden');
+  ex.textContent = (correct ? '✅ Верно! ' : '❌ Не совсем. ') + item.explain;
+  el('nextBtn').disabled = false;
+  el('nextBtn').textContent = s.idx === (s.mode === 'exam' ? EXAM.length : MODULES[s.mi].quiz.length) - 1 ? 'Результат →' : 'Далее →';
+}
+function nextQ() {
+  const s = qState;
+  s.idx++;
+  const total = s.mode === 'exam' ? EXAM.length : MODULES[s.mi].quiz.length;
+  if (s.idx < total) { renderQuestion(); return; }
+  if (s.mode === 'quiz') {
+    progress[`m${s.mi}quiz`] = Math.max(progress[`m${s.mi}quiz`] ?? 0, s.score); save();
+    const need = Math.ceil(total * 0.8);
+    view().innerHTML = `
+      <h1>Результат квиза</h1>
+      <div style="font-size:48px;font-weight:800;color:${s.score >= need ? '#4ade80' : '#f87171'};margin:10px 0">${s.score} / ${total}</div>
+      <p>${s.score >= need ? '✅ Зачёт! Модуль закрыт.' : `Нужно ≥ ${need}. Перечитай уроки и пересдай — это нормально, так учатся.`}</p>
+      <button class="btn" onclick="renderModule(${s.mi})">← К модулю</button>`;
+  } else {
+    const passed = s.score >= 12;
+    if (passed) progress.examPassed = true;
+    save();
+    view().innerHTML = `
+      <h1>🏆 Результат экзамена</h1>
+      <div style="font-size:48px;font-weight:800;color:${passed ? '#4ade80' : '#f87171'};margin:10px 0">${s.score} / ${EXAM.length}</div>
+      <p>${passed ? '<strong>Экзамен сдан!</strong> Ты прошёл курс: от устройства нейросетей до своего AI-сервиса в проде. Следующий шаг — применить это: доведи финальный проект из модуля 6 до репозитория и покажи людям.' : `Для зачёта нужно ≥ 12. Разбор ошибок ниже, пересдать можно в любой момент.`}</p>
+      ${s.log.filter((r) => !r.correct).map((r) => `<div class="explain" style="border-left-color:#f87171"><strong>${r.q}</strong><br>${r.explain}</div>`).join('')}
+      <button class="btn" onclick="goHome()">← К оглавлению</button>`;
+  }
+  window.scrollTo(0, 0);
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+renderHome();
+</script>
+</body>
+</html>
