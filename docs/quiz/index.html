@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Квиз: основы нейросетей</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+    background: #09090b; color: #f4f4f5;
+    min-height: 100vh; display: flex; justify-content: center;
+    padding: 24px 16px 48px;
+  }
+  main { width: 100%; max-width: 480px; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .subtitle { color: #a1a1aa; font-size: 14px; margin-bottom: 20px; }
+  .progress-track { height: 8px; background: #27272a; border-radius: 99px; overflow: hidden; margin-bottom: 20px; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, #059669, #34d399); border-radius: 99px; transition: width .3s; }
+  .topic { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: #71717a; margin-bottom: 6px; }
+  .question { font-size: 18px; line-height: 1.4; margin-bottom: 16px; }
+  .option {
+    display: block; width: 100%; text-align: left;
+    background: #18181b; border: 1px solid #27272a; border-radius: 14px;
+    padding: 14px 16px; margin-bottom: 10px; color: #e4e4e7;
+    font-size: 15px; line-height: 1.35; cursor: pointer; transition: border-color .15s, background .15s;
+  }
+  .option:hover:not(:disabled) { border-color: #52525b; }
+  .option:disabled { cursor: default; }
+  .option.correct { background: #052e16; border-color: #16a34a; }
+  .option.wrong { background: #450a0a; border-color: #dc2626; }
+  .option.dimmed { opacity: .45; }
+  .explain {
+    background: #18181b; border: 1px solid #27272a; border-left: 3px solid #34d399;
+    border-radius: 12px; padding: 12px 14px; font-size: 14px; line-height: 1.5;
+    color: #d4d4d8; margin: 12px 0 16px; display: none;
+  }
+  .explain.show { display: block; }
+  .btn {
+    display: inline-block; background: #10b981; color: #052e16; border: none;
+    border-radius: 12px; padding: 12px 22px; font-size: 15px; font-weight: 700; cursor: pointer;
+  }
+  .btn:disabled { opacity: .35; cursor: default; }
+  .btn-ghost { background: transparent; color: #a1a1aa; border: 1px solid #27272a; }
+  .hidden { display: none; }
+  .score-num { font-size: 56px; font-weight: 800; color: #34d399; margin: 8px 0; }
+  .score-msg { color: #d4d4d8; line-height: 1.5; margin-bottom: 20px; }
+  .review { margin-top: 20px; text-align: left; }
+  .review-item { background: #18181b; border: 1px solid #27272a; border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; font-size: 14px; line-height: 1.45; }
+  .review-item .q { color: #e4e4e7; margin-bottom: 4px; }
+  .review-item.ok { border-left: 3px solid #16a34a; }
+  .review-item.fail { border-left: 3px solid #dc2626; }
+  .review-item .a { color: #a1a1aa; }
+  footer { margin-top: 32px; text-align: center; font-size: 12px; color: #52525b; }
+  footer a { color: #71717a; }
+</style>
+</head>
+<body>
+<main>
+  <!-- ЭКРАН СТАРТА -->
+  <section id="start">
+    <h1>🧠 Квиз: основы нейросетей</h1>
+    <p class="subtitle">12 вопросов — от «что такое токен» до «зачем агенту MCP». После каждого ответа — короткое понятное объяснение.</p>
+    <button class="btn" onclick="startQuiz()">Начать →</button>
+  </section>
+
+  <!-- ЭКРАН ВОПРОСА -->
+  <section id="quiz" class="hidden">
+    <div class="progress-track"><div class="progress-fill" id="progress"></div></div>
+    <div class="topic" id="topic"></div>
+    <div class="question" id="question"></div>
+    <div id="options"></div>
+    <div class="explain" id="explain"></div>
+    <button class="btn" id="nextBtn" disabled onclick="nextQuestion()">Далее →</button>
+  </section>
+
+  <!-- ЭКРАН РЕЗУЛЬТАТА -->
+  <section id="result" class="hidden">
+    <h1>Результат</h1>
+    <div class="score-num" id="scoreNum"></div>
+    <p class="score-msg" id="scoreMsg"></p>
+    <button class="btn" onclick="startQuiz()">Пройти ещё раз</button>
+    <div class="review" id="review"></div>
+  </section>
+
+  <footer>Часть проекта <a href="/courier-bot/">Курьер-дашборд</a> · github.com/promax-star/courier-bot</footer>
+</main>
+
+<script>
+const QUESTIONS = [
+  {
+    topic: 'Основы',
+    q: 'Что на самом деле делает нейросеть?',
+    options: [
+      'Думает как человек, только быстрее',
+      'Считает математическую функцию: умножает числа на веса и складывает',
+      'Ищет ответ в готовой базе знаний',
+      'Копирует ответы людей из интернета',
+    ],
+    answer: 1,
+    explain: 'Внутри нейросети нет «мышления» и базы готовых ответов — это гигантская математическая функция с миллиардами настраиваемых коэффициентов (весов). Обучение = подбор весов на примерах.',
+  },
+  {
+    topic: 'Основы',
+    q: 'Что такое токен?',
+    options: [
+      'Пароль для доступа к модели',
+      'Один символ текста',
+      'Кусочек текста (слово или часть слова), на которые модель делит текст',
+      'Единица оплаты API',
+    ],
+    answer: 2,
+    explain: 'Модель не видит буквы и слова — она делит текст на токены: «привет» может стать 2–3 токенами. От количества токенов зависят лимиты контекста и цена запроса.',
+  },
+  {
+    topic: 'LLM',
+    q: 'Почему языковая модель иногда «галлюцинирует» (уверенно врёт)?',
+    options: [
+      'Её специально так запрограммировали',
+      'Она предсказывает правдоподобный текст, а не проверяет факты',
+      'В ней мало памяти',
+      'Это происходит только на русском языке',
+    ],
+    answer: 1,
+    explain: 'LLM — предсказатель следующего токена. Если правдоподобный текст выглядит как уверенный ответ, модель его выдаст, даже если это неправда. Поэтому факты надо проверять или давать модели источники (RAG).',
+  },
+  {
+    topic: 'LLM',
+    q: 'Что делает параметр temperature?',
+    options: [
+      'Ограничивает длину ответа',
+      'Регулирует «случайность»: выше — креативнее и непредсказуемее, ниже — строже и стабильнее',
+      'Скорость генерации',
+      'Температуру сервера',
+    ],
+    answer: 1,
+    explain: 'Temperature управляет тем, насколько смело модель выбирает менее вероятные токены. Для кода и фактов ставят низкую (~0–0.3), для идей и текстов — выше (~0.7–1).',
+  },
+  {
+    topic: 'Промптинг',
+    q: 'Какой промпт с наибольшей вероятностью даст хороший результат?',
+    options: [
+      '«Напиши текст»',
+      '«Напиши текст про что-нибудь интересное, коротко»',
+      '«Напиши 3 варианта поста для Telegram про нашего курьерского бота, для аудитории 18–30 лет, тон дружелюбный, до 200 символов каждый»',
+      '«Сделай лучшe»',
+    ],
+    answer: 2,
+    explain: 'Хороший промпт = роль + задача + контекст + формат + ограничения. Чем конкретнее (что, для кого, в каком виде), тем меньше модель «додумывает» за тебя.',
+  },
+  {
+    topic: 'Промптинг',
+    q: 'Что такое few-shot промптинг?',
+    options: [
+      'Задать вопрос несколько раз',
+      'Показать модели 2–3 примера «вход → правильный выход» прямо в промпте',
+      'Использовать маленькую модель',
+      'Спросить у нескольких моделей',
+    ],
+    answer: 1,
+    explain: 'Модели отлично копируют паттерн из примеров. Пара примеров нужного формата часто работает лучше, чем длинное описание формата словами.',
+  },
+  {
+    topic: 'Харнес',
+    q: 'У агента-кодера «переполнилось контекстное окно». Что это значит?',
+    options: [
+      'Агент сломался, надо переустанавливать',
+      'Вся история диалога и файлы перестали помещаться в память модели — старое придётся сжать или выбросить',
+      'Закончились токены на счету',
+      'Файл слишком большой для диска',
+    ],
+    answer: 1,
+    explain: 'Контекстное окно — сколько токенов модель «видит» за раз. Умный харнес сжимает историю в саммари (как это сделано в этом чате), иначе агент «забывает» начало работы.',
+  },
+  {
+    topic: 'Харнес',
+    q: 'Зачем агенту суб-агенты (sub-agents)?',
+    options: [
+      'Чтобы работать быстрее за счёт параллельности и не засорять основной контекст',
+      'Чтобы отвечать за агента',
+      'Это резервная копия агента',
+      'Так называют пользователей агента',
+    ],
+    answer: 0,
+    explain: 'Суб-агент — отдельный «работник» со своим чистым контекстом: например, ищет по кодовой базе и возвращает только вывод, а не тысячи строк файлов. Основной диалог остаётся коротким и дешёвым.',
+  },
+  {
+    topic: 'Харнес',
+    q: 'Что такое MCP?',
+    options: [
+      'Модель компьютерного зрения',
+      'Протокол, по которому агент подключает внешние инструменты: базы, API, браузеры',
+      'Формат хранения промптов',
+      'Способ обучения модели',
+    ],
+    answer: 1,
+    explain: 'MCP (Model Context Protocol) — «USB-порт» для агентов: любой сервис может отдать агенту свои инструменты по одному стандарту, и агент сможет их вызывать.',
+  },
+  {
+    topic: 'RAG',
+    q: 'Компания хочет, чтобы бот отвечал по её внутренней документации. Какой подход самый практичный?',
+    options: [
+      'Дописать документацию в каждый промпт вручную',
+      'Дообучить модель на документах — это быстро и дёшево',
+      'RAG: по вопросу искать нужные куски документов и подкладывать их в контекст',
+      'Бот сам догадается',
+    ],
+    answer: 2,
+    explain: 'RAG (Retrieval-Augmented Generation) = «поиск + генерация». Дообучение (fine-tuning) дорого и учит стилю, а не фактам. RAG даёт свежие факты и позволяет ставить ссылки на источник.',
+  },
+  {
+    topic: 'RAG',
+    q: 'Что такое эмбеддинг?',
+    options: [
+      'Картинка внутри ответа модели',
+      'Вектор чисел, который кодирует смысл текста: близкие по смыслу тексты → близкие векторы',
+      'Ошибка в нейросети',
+      'Встроенная реклама в ответе',
+    ],
+    answer: 1,
+    explain: 'Эмбеддинг — «координаты смысла» текста в виде вектора. Именно на них работает поиск в RAG: вопрос и нужный абзац документации оказываются рядом в векторном пространстве.',
+  },
+  {
+    topic: 'Практика',
+    q: 'Где правильно хранить токен Telegram-бота, если код лежит на GitHub?',
+    options: [
+      'Прямо в коде, репозиторий же приватный',
+      'В файле config.json, закоммиченном в репозиторий',
+      'В секретах GitHub (Actions secrets) / переменных окружения',
+      'В комментарии в начале файла',
+    ],
+    answer: 2,
+    explain: 'Секреты никогда не попадают в код: репозиторий могут сделать публичным, история коммитов хранит всё. Правильно — env-переменные и хранилище секретов (у GitHub Actions это Secrets). Утечку ключа в истории не «удалишь» — только revoke.',
+  },
+];
+
+let order = [];
+let idx = 0;
+let score = 0;
+const reviewLog = [];
+
+function el(id) { return document.getElementById(id); }
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function startQuiz() {
+  order = shuffle(QUESTIONS.map((_, i) => i));
+  idx = 0; score = 0; reviewLog.length = 0;
+  el('start').classList.add('hidden');
+  el('result').classList.add('hidden');
+  el('quiz').classList.remove('hidden');
+  showQuestion();
+}
+
+function showQuestion() {
+  const item = QUESTIONS[order[idx]];
+  el('progress').style.width = `${(idx / QUESTIONS.length) * 100}%`;
+  el('topic').textContent = `Вопрос ${idx + 1} из ${QUESTIONS.length} · ${item.topic}`;
+  el('question').textContent = item.q;
+  el('explain').classList.remove('show');
+  el('nextBtn').disabled = true;
+
+  const box = el('options');
+  box.innerHTML = '';
+  shuffle(item.options.map((text, orig) => ({ text, orig }))).forEach(({ text, orig }) => {
+    const b = document.createElement('button');
+    b.className = 'option';
+    b.textContent = text;
+    b.onclick = () => answer(orig, b);
+    box.appendChild(b);
+  });
+}
+
+function answer(orig, btn) {
+  const item = QUESTIONS[order[idx]];
+  const buttons = [...el('options').children];
+  buttons.forEach((b) => { b.disabled = true; b.classList.add('dimmed'); });
+  buttons.forEach((b, i) => b.classList.remove('dimmed'));
+
+  const correct = orig === item.answer;
+  if (correct) score++;
+  reviewLog.push({ q: item.q, correct, explain: item.explain });
+
+  buttons.forEach((b) => {
+    if (b === btn) b.classList.add(correct ? 'correct' : 'wrong');
+    if (!correct && b.textContent === item.options[item.answer]) b.classList.add('correct');
+  });
+
+  const ex = el('explain');
+  ex.textContent = (correct ? '✅ Верно! ' : '❌ Не совсем. ') + item.explain;
+  ex.classList.add('show');
+  el('nextBtn').disabled = false;
+  el('nextBtn').textContent = idx === QUESTIONS.length - 1 ? 'Результат →' : 'Далее →';
+}
+
+function nextQuestion() {
+  idx++;
+  if (idx < QUESTIONS.length) { showQuestion(); return; }
+  el('quiz').classList.add('hidden');
+  el('result').classList.remove('hidden');
+  el('progress').style.width = '100%';
+  el('scoreNum').textContent = `${score} / ${QUESTIONS.length}`;
+  let msg;
+  if (score <= 4) msg = 'Начало положено! Перечитай пояснения — они покрывают весь базовый словарь AI-разработки.';
+  else if (score <= 8) msg = 'Хороший уровень! Пробелы — в пояснениях к ошибкам. Прогони ещё раз, чтобы закрепить.';
+  else if (score <= 11) msg = 'Сильный результат. Тебе будет легко на любом AI-стаже.';
+  else msg = 'Идеально! Базовый словарь нейросетей и агентных харнесов у тебя в кармане.';
+  el('scoreMsg').textContent = msg;
+  el('review').innerHTML =
+    '<h1 style="font-size:16px;margin-bottom:12px">Разбор</h1>' +
+    reviewLog.map((r) =>
+      `<div class="review-item ${r.ok ? 'ok' : 'fail'}"><div class="q">${r.ok ? '✅' : '❌'} ${r.q}</div><div class="a">${r.explain}</div></div>`
+    ).join('');
+}
+</script>
+</body>
+</html>
